@@ -1,0 +1,342 @@
+
+---
+title: "Tuberculosis Data set"
+author: "Raaga Likhitha"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document: default
+---
+
+
+##Tuberculosis treatment Data (Part 2)
+
+
+
+
+##Tuberculosis treatment Data 
+
+
+```{r}
+load("C:/Users/drraa/Downloads/tb-1.Rdata")
+head(tb)
+summary(tb)
+
+```
+The dataset shows that our sample size is  1,234 patients, with a Sex distribution of  743 males (60.2%) and 491 females (39.8%). The Age groups are fairly evenly distributed across four categories, which are 21 and younger: 321 patients, 22 to 26: 326 patients, 27 to 37: 291 patients and 38 and older: 296 patients. Most individuals in our dataset are aged 21 and younger (321) or 22 to 26 (326).Socioeconomic Factors such as poverty status show that  1,024 are not in poverty, 210 are in poverty/extreme poverty. The education levels of the patients in the dataset show that there are 720 patients that completed secondary education, 514 did not.In terms of health risk factoors such as Alcohol use and drug use, 233 individuals reported a history of alcohol use, while 190 reported drug use.Only 77 had a history of rehabilitation.Most individuals had a "Normal" BMI (916), with smaller proportions being "Underweight" (151) or "Overweight/Obese" (167). A small number of sample, has MDR-TB(81).Only 54 individuals are diabetic. A major chunk of sample included cured patients(1017) and 127 were defaults, with 20 current patients and 40 transferred patients.The data shows a relatively high cure rate (82.4%) but also indicates notable challenges with treatment default (10.3%), which aligns with the background information about adherence being a major barrier to TB elimination.
+
+
+
+
+## Exploration of Data set. Brief summary of features of the study participants with respect to the demographic variables age, sex, poverty, and edu. What proportion of patients defaulted from TB treatment
+
+
+```{r Data exploration}
+library(dplyr)
+summary(tb$age) 
+summary(tb$sex) 
+summary(tb$poverty)  
+summary(tb$edu)
+
+default_proportion <- mean(tb$default, na.rm = TRUE)  # Proportion of TRUE in `default`
+cat("Proportion of patients who defaulted: ", default_proportion * 100, "%\n")
+
+```
+Exploratory data analysis showed that there is a fairly even distribution across age groups with 21 and younger having 321 patients (26.0%), 22 to 26 having 326 patients (26.4%) and 27 to 37 having 291 patients (23.6%) and  38 and older having 296 patients (24.0%). The gender distribution showed Males with 743 patients (60.2%) and  Females with 491 patients (39.8%). Many of the patients in the given data set had patients that are not in poverty with1,024 patients (83.0%) and  there were only 210 patients (17.0%) with Poverty/extreme poverty. A major chunk of the patients had completed secondary education with 720 patients (58.3%) and the ones that didnt complete included 514 patients (41.7%). The treatment Default Rate
+stood at 10.29% of patients defaulted from TB treatment. This represents approximately 127 patients who did not complete their prescribed treatment regimen. The data shows a predominantly male population with most patients not experiencing poverty, and a slight majority having completed secondary education.
+
+
+```{r Cross tabulation of demographic variables; Visualisations}
+library(ggplot2)
+library(dplyr)
+
+table(tb$age, tb$sex)
+table(tb$poverty, tb$edu)
+
+chisq.test(tb$poverty, tb$edu)
+chisq.test(tb$age, tb$sex)
+
+ggplot(tb, aes(x = age, fill = sex)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Age Distribution by Sex",
+       x = "Age Group",
+       y = "Count") +
+  theme_minimal()
+
+ggplot(tb, aes(x = poverty, fill = edu)) +
+  geom_bar(position = "fill") +
+  labs(title = "Education Level by Poverty Status",
+       x = "Poverty Status",
+       y = "Proportion") +
+  theme_minimal()
+
+```
+
+The graphs show that Younger age groups (21 and younger, 22 to 26) have more male participants. Female counts remain relatively stable across age groups compared to males in age and sex distribution chart and for the Education by Poverty Status chart Proportion of participants with secondary education is much higher in "Not in poverty." Participants in "Poverty/extreme poverty" are more likely to have no secondary education.
+
+```{r Proportion Analysis with confidence intervals}
+prop.test(sum(tb$default), nrow(tb))
+
+# Default rates by demographic groups
+tb %>%
+  group_by(sex) %>%
+  summarise(default_rate = mean(default, na.rm = TRUE))
+
+tb %>%
+  group_by(poverty) %>%
+  summarise(default_rate = mean(default, na.rm = TRUE))
+
+```
+
+Based on the chi-square test results and cross-tabulations of the demographic relationships in the TB study, we can see that males outnumber females across all age groups. This is most pronounced difference in 22-26 age group (213 males vs 113 females) and most balanced in 27-37 age group (163 males vs 128 females). The chi-square test for age and sex gave us the values as  χ²(3) = 6.0865, p = 0.1075. This implies that there is no significant association between age and sex . On the other hand there seems to be a strong association between poverty and education (χ²(1) = 56.758, p < 0.001). In  this too, among those not in poverty,647 completed secondary education and 377 did not complete secondary education. Among those in poverty/extreme poverty, 73 completed secondary education and 137 did not complete secondary education. This shows that there is a clear pattern showing those in poverty are less likely to complete secondary education. From this we can see that sex distribution across age groups is relatively consistent and Poverty status significantly impacts educational attainment. The relationship between poverty and education is particularly strong, as indicated by the very low p-value (4.929e-14). Education completion rates are notably lower among those in poverty (34.8%) compared to those not in poverty (63.2%). These findings suggest that while demographic factors like age and sex are independently distributed, socioeconomic status (poverty) has a significant relationship with educational attainment in this population.
+
+
+
+### 3.Proportion of patients who default from treatment by diabetics status. Formally testing whether the proportion of patients who default from treatment differs between diabetics and non-diabetics. 
+
+```{r proportion of patients defaulting treatment by diabetes status; Expected number of successes- failures, z-tests}
+
+default_by_diabetes <- tb %>%
+  group_by(dm) %>%
+  summarise(
+    total = n(),
+    defaults = sum(trt.outcome == "Default"),
+    default_rate = mean(trt.outcome == "Default")
+  )
+print("Default rates by diabetes status:")
+print(default_by_diabetes)
+
+# Expected counts for success-failure condition
+expected_success <- default_by_diabetes$total * default_by_diabetes$default_rate
+expected_failure <- default_by_diabetes$total * (1 - default_by_diabetes$default_rate)
+cat("Expected successes:", expected_success, "\n")
+cat("Expected failures:", expected_failure, "\n")
+
+# Formal hypothesis test (Two-Proportion Z-Test)
+# Null Hypothesis (H0): The proportions of default are equal for diabetics and non-diabetics.
+# Alternative Hypothesis (H1): The proportions of default differ for diabetics and non-diabetics.
+
+library(stats)
+prop_test <- prop.test(
+  x = default_by_diabetes$defaults,  # Number of successes 
+  n = default_by_diabetes$total,     # Total observations in each group
+  correct = FALSE                 
+)
+print("Two-Proportion Z-Test Results:")
+print(prop_test)
+
+cat("Summary:\n")
+cat("Default rate for non-diabetics:", round(default_by_diabetes$default_rate[default_by_diabetes$dm == "No"] * 100, 2), "%\n")
+cat("Default rate for diabetics:", round(default_by_diabetes$default_rate[default_by_diabetes$dm == "Yes"] * 100, 2), "%\n")
+cat("P-value:", prop_test$p.value, "\n")
+if (prop_test$p.value < 0.05) {
+  cat("Conclusion: Reject the null hypothesis. The proportion of defaults differs between diabetics and non-diabetics.\n")
+} else {
+  cat("Conclusion: Fail to reject the null hypothesis. No significant difference in default proportions.\n")
+}
+
+```
+
+
+From this analysis we can understand that  Non-diabetics have a default rate of 10.76%, while diabetics have a default rate of 0%. The two proportion z tests show that χ² = 6.4786, df = 1 and p-value = 0.01092 while the 95% CI for difference in proportions  is [0.0899, 0.1253]. From this we can conclude that the difference in default rates is statistically significant (p = 0.01092) and  expected counts satisfy the success-failure condition (>5). There is a significant difference in default rates between diabetic and non-diabetic patients, with non-diabetic patients showing a higher rate of default. However, this finding should be interpreted with caution due to the small number of diabetic patients (n=54) compared to non-diabetic patients (n=1,180).The unexpected result of zero defaults among diabetic patients suggests potential confounding factors or special attention given to diabetic patients during treatment that might influence adherence rates.
+
+###4. Association between defaulting from treatment and the demographic variables. Fitting a model estimating the association between defaulting from treatment and the demographic variables age, sex, poverty, and edu.Identifying factors significantly associated with treatment default at the α = 0.05 significance level.Re-fit the model with diabetes status as an additional predictor variable. Examining the inferential results related to diabetes status. Verifying if this model or the analysis from part b) preferable for understanding the association between treatment default and diabetes status.
+
+```{r Regression model}
+
+library(tidyverse)
+library(broom)
+
+demographics_model <- glm(
+  default ~ age + sex + poverty + edu,
+  data = tb,
+  family = binomial
+)
+
+summary(demographics_model)
+
+```
+
+From the logistic regression results for the Demographics Model, we can identify the factors significantly associated with treatment default at the α = 0.05 significance level, where in Age (38 and older) had an Estimate of -1.22311 and p-value of 0.000183. This implies that Patients 38 and older have significantly lower odds of defaulting compared to the reference age group (21 and younger). For the gender,  males had an estimate of 0.83544
+p-value of 0.000191 which implies that male patients have significantly higher odds of defaulting compared to female patients. In education, we can see that Estimate is -0.93120 and p-value is 4.70e-06 which means that Patients who completed secondary education have significantly lower odds of defaulting compared to those who did not. These factors show that being 38 years or older is associated with a decreased likelihood of defaulting and being male is associated with an increased likelihood of defaulting. Having completed secondary education is associated with a decreased likelihood of defaulting. Poverty status was not found to be significantly associated with treatment default in this model (p-value: 0.397196).The predictors (age groups 22 to 26, 27 to 37, and poverty status) are not significantly associated with treatment default at alpha=0.05.
+
+```{r tidy}
+library(broom)
+demographics_tidy <- tidy(demographics_model)
+print(demographics_tidy)
+
+```
+
+```{r Significant predictors}
+significant_demographics <- demographics_tidy %>% filter(p.value < 0.05)
+print(significant_demographics)
+```
+
+```{r Diabetes enhanced model-refitted model}
+diabetes_enhanced_model <- glm(
+  trt.outcome == "Default" ~ age + sex + poverty + edu + dm,
+  data = tb,
+  family = binomial
+)
+
+summary(diabetes_enhanced_model)
+
+## significant predictors in the diabetes enhanced model
+library(broom)
+significant_predictors <- tidy(diabetes_enhanced_model) %>%
+  filter(p.value < 0.05)
+
+cat("\nSignificant Predictors in diabetes enhanced model (p < 0.05):\n")
+print(significant_predictors)
+
+```
+
+This indicates that the significant predictors remain consistent with the earlier model which were age38 and older, sexMale, and eduYes.Adding dm did not improve the model, as diabetes status is not significantly associated with default.The AIC value for the refitted model (768.66) is slightly better than the "Demographics Model" AIC (773.84), but the improvement is minimal. From this we can say that diabetes status (dmYes) had an extremely large standard error (525.3960) and  Very large negative coefficient (-14.9122) with a non-significant p-value (0.977357). This suggests perfect separation in the data.The demographic variables maintain similar effects across both our models and adding diabetes creates estimation issues due to zero defaults in the diabetic group, which makes the original demographics model more reliable for understanding default risk
+```{r effect of diabetes status, model comparison AIC}
+
+
+# Examine the effect of diabetes status
+diabetes_effect <- summary(diabetes_enhanced_model)$coefficients["dmYes", ]
+
+cat("\nEffect of Diabetes Status in Diabetes-Enhanced Model:\n")
+print(diabetes_effect)
+
+if ("dmYes" %in% rownames(summary(diabetes_enhanced_model)$coefficients)) {
+  diabetes_effect <- summary(diabetes_enhanced_model)$coefficients["dmYes", ]
+  cat("\nEffect of Diabetes Status in Diabetes-Enhanced Model:\n")
+  print(diabetes_effect)
+  
+  if (diabetes_effect["Pr(>|z|)"] < 0.05) {
+    cat("\nDiabetes status is significantly associated with treatment default in the Diabetes-Enhanced Model.\n")
+  } else {
+    cat("\nDiabetes status is not significantly associated with treatment default in the Diabetes-Enhanced Model.\n")
+  }
+} else {
+  cat("\nTerm 'dmYes' not found in the Diabetes-Enhanced Model.\n")
+}
+
+# Model Comparison using AIC
+model_comparison <- tibble(
+  Model = c("Demographics Model", "Diabetes-Enhanced Model"),
+  AIC = c(AIC(demographics_model), AIC(diabetes_enhanced_model))
+) %>%
+  mutate(Difference = AIC - min(AIC))
+
+cat("\nModel Comparison:\n")
+print(model_comparison)
+
+
+```
+
+when we compare the models, AIC for diabetes-enhanced model is slightly lower than the AIC for the demographics model. This indicates a marginal improvement in model fit by including dm. However, it is not as big for us to consider including it in our regression model.
+
+###5)Association between defaulting from treatment and history of residence at a rehabilitation center. Previous studies have found that alcohol abuse and recreational drug use are associated with default from treatment.  Here we are formally assessing whether there is evidence of an association between defaulting from treatment and history of residence at a rehabilitation center. In addition , we are assessing whether there is evidence of an association between defaulting from treatment and history of residence at a rehabilitation center after adjusting for prior history of illicit drug use and prior history of alcohol abuse. Summarize your findings. Using language accessible to a general audience
+
+For this analysis,to get thhe association between defaulting from treatment and a history of residence at a rehabilitation center, we will be doing in two steps, where we do  an unadjusted analysis to get the association between defaulting and rehabilitation history without accounting for other factors. and an adjusted analysis to show the association between defaulting and rehabilitation history, adjusted for prior history of illicit drug use and alcohol abuse.
+
+i. Association between default treatment and rehab
+
+```{r unadjusted model default treatment and rehab}
+library(dplyr)
+library(broom)
+
+rehab_unadjusted_model <- glm(
+  trt.outcome == "Default" ~ rehab,
+  data = tb,
+  family = binomial
+)
+
+rehab_unadjusted_summary <- summary(rehab_unadjusted_model)$coefficients
+print(rehab_unadjusted_summary)
+
+# Print label and the summary
+cat("\nUnadjusted Model Summary:\n")
+print(rehab_unadjusted_summary)
+
+
+```
+
+
+From the above model, we have Rehabilitation Center Effect (rehabYes) model has the values of Coefficient estimate at 1.604, Standard error of0.265,
+z-value of  6.063 and p-value of  1.33e-09 (highly significant). We can intrepret that the positive coefficient (1.604) indicates that patients with a history of rehabilitation center residence have higher odds of defaulting from TB treatment compared to those without such history.The relationship is highly statistically significant (p < 0.001), suggesting strong evidence of an association between rehabilitation center history and treatment default. The baseline log-odds of default (intercept = -2.336) represents the default rate for those without rehabilitation center history. This unadjusted analysis shows a strong association between rehabilitation center history and treatment default, but it doesn't account for potential confounding factors like drug and alcohol use history, which may be important underlying factors in this relationship.
+```{r chisquare test and contingency table}
+rehab_default_table <- table(tb$rehab, tb$trt.outcome == "Default")
+cat("\nContingency Table:\n")
+print(rehab_default_table)
+
+chisq_test <- chisq.test(rehab_default_table)
+cat("\nChi-Square Test Results:\n")
+print(chisq_test)
+
+cat("\nObserved Counts:\n")
+print(chisq_test$observed)
+
+cat("\nExpected Counts:\n")
+print(chisq_test$expected)
+
+```
+
+these results shows us that there is a positive coefficient (1.604) which indicates that patients with rehabilitation history have significantly higher odds of defaulting from TB treatment. This relationship is highly statistically significant (p < 0.001). The observed default rate is substantially higher among those with rehabilitation history (32.5% vs 8.8%). The Expected counts meet the minimum requirements for chi-square testing. Both logistic regression and chi-square test confirm a strong association between rehabilitation history and treatment default
+This analysis shows a clear, strong association between rehabilitation center history and increased risk of treatment default, though it doesn't account for potential confounding factors like substance use history.
+
+
+ii. association between defaulting and rehabilitation history, adjusted for prior history of illicit drug use and alcohol abuse.
+```{r adjusted model -Default treatment, rehab, drug and alcohol}
+
+rehab_adjusted_model <- glm(
+  trt.outcome == "Default" ~ rehab + drug + alcohol,
+  data = tb,
+  family = binomial
+)
+
+rehab_adjusted_summary <- summary(rehab_adjusted_model)$coefficients
+print(rehab_adjusted_summary)
+
+```
+ This adjusted model gave us these results, Rehabilitation Center (rehabYes) had a Coefficient of 0.089, Standard Error of 0.314 and z-value of 0.282
+p-value of 0.778 (not significant) and for Drug Use (drugYes) we had a Coefficient of 1.715, Standard Error of 0.239, z-value of 7.168 and p-value of  7.59e-13 (highly significant). the Alcohol Use (alcoholYes) factor had a Coefficient of 0.713, Standard Error of 0.228,z-value of 3.120 and p value is 0.002 (significant). This means that when we adjusted the model, where we controlled for drug and alcohol use, the Rehab coefficient reduced to 0.089 (SE: 0.314) and p value was no longer significant (p = 0.778). The drug use (coef: 1.715, p < 0.001) and alcohol use (coef: 0.713, p = 0.002) are significant predictors. Rehabilitation history appears to be strongly associated with treatment default in the unadjusted analysis. However, when we account for substance abuse (drug and alcohol use), this association disappears. This suggests that individuals in rehabilitation centers are more likely to default not because of their rehabilitation history, but due to underlying substance abuse issues. Addressing drug and alcohol use is critical for improving treatment adherence.
+
+
+###6) Association of treatment default and the demographic variables. Here we fit a model predicting treatment default from the demographic variables (age, sex, poverty, and edu), history of substance abuse variables, and treatment for MDR-TB. Based on this model,  we summarize the risk factors for defaulting from TB treatment.
+
+
+```{r Fitting the model with demographic variables, history of substance abuse variables and treatment of MDR-TB}
+
+default_risk_model <- glm(
+  trt.outcome == "Default" ~ age + sex + poverty + edu + drug + alcohol + mdr.tb,
+  data = tb,
+  family = binomial
+)
+
+default_risk_summary <- summary(default_risk_model)$coefficients
+default_risk_summary_df <- as.data.frame(default_risk_summary)
+default_risk_summary_df$term <- rownames(default_risk_summary_df)
+
+print(default_risk_summary_df)
+
+significant_risk_factors <- default_risk_summary_df %>%
+  filter(`Pr(>|z|)` < 0.05)
+
+print(significant_risk_factors)
+
+```
+This logistic model  suggests that the following are the risk factors for defaulting from TB treatment. Patients 38 and older have a significantly lower risk of defaulting (coefficient = -0.804, p = 0.0167) compared to the reference group (21 and younger). Other age groups do not show significant differences. In education, Completing secondary education (eduYes) is associated with a lower risk of defaulting (coefficient = -0.530, p = 0.0136), indicating that higher education is a protective factor. Drug use (drugYes) is the strongest risk factor, significantly increasing the odds of defaulting (coefficient = 1.536, p < 0.0001). Alcohol use (alcoholYes) also increases the risk of defaulting (coefficient = 0.675, p = 0.0043). Patients being treated for multidrug-resistant TB (mdr.tbYes) have a higher risk of defaulting (coefficient = 0.921, p = 0.0052). Sex and poverty status were not found to be statistically significant predictors of default risk in this model. In summary, the highest risk for defaulting is associated with drug use, followed by MDR-TB treatment, alcohol use, and younger age. Higher education appears to be protective against defaulting. These findings suggest that interventions targeting substance abuse and providing additional support for younger patients and those with MDR-TB could be effective in reducing treatment default rates.
+
+
+###7)When the results from this study will be used by local clinics to identify TB patients that might benefit from additional support during treatment, such as enrollment in an incentive program or financial aid (e.g., reimbursement of transportation fees to and from clinics). Upon diagnosis with TB, patients will be asked to provide information about themselves by completing questionnaires similar to those completed by study participants. Then  I am commenting on whether the use of self-reported data in the earlier analysis represents a major limitation for understanding which TB patients should receive additional support during treatment.
+ 
+After the analysis, we can confidently say that self-reported data provides direct information about patients' socioeconomic status, lifestyle habits (e.g., drug/alcohol use), and treatment challenges that might not be captured through clinical records alone. The analysis identified several significant risk factors that can be obtained through questionnaires such as Educational status, Age, Substance use history and MDR-TB status.these questionnaires are relatively simple and cost-effective, allowing clinics to gather large amounts of information quickly. the self reported data is also how patients perceive themselves as which is why it becomes very important data points for providers to tailor their interventions and treatment plans.
+
+Limitations of the self reported data could be two fold. One being underreporting of substance use which could be interpreted in multiple ways as they are subjected to cognitive biases that patients hold for themselves, which are majorly influenced by Social stigma, Fear of judgment, Legal concerns and  Potential impact on treatment access.Second one being, complex socioeconomic factors such as Self-reported poverty status may be Subjective, Influenced by shame or pride and Inconsistently defined by patients. This could fall under social desirability bias, where patients might say what is more acceptable than what really exists in their particular scenario.
+
+In addition, self reported data is always subject to recall bias. Patients may struggle to accurately recall details about their socioeconomic conditions, treatment history, or substance use, especially over long periods. In addition, there is always the chances of missing data when it comes to self reported data.
+
+This means that if key predictors like drug use or alcohol abuse are underreported, some high-risk patients may not be flagged for additional support, which means that the program for TB treatment fails.  In addition, Self-reported data may not capture other important predictors, such as biological markers or healthcare system factors (e.g., clinic accessibility or treatment side effects). While patient-reported data provides valuable context, decisions should ideally combine self-reports with objective measures (e.g., clinical records, lab results) to ensure a more complete understanding of patients' risks.
+
+For recommendations, I would suggest that the self-reported data should be supplemented with Medical records, Clinical assessments, Social worker evaluations and Objective measures of socioeconomic status. This would essentially means we have a hybrid approach combining Self-reported demographic data (likely reliable), Professional assessment of risk factors (substance use, poverty), Clinical indicators and Social support needs assessment.While self-reported data provides valuable insights, it should not be the sole basis for determining support needs. A more comprehensive assessment approach would better identify patients requiring additional support during treatment.
+
+
+
+
+
